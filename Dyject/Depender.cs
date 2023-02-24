@@ -23,7 +23,7 @@ public abstract class Depender<T> where T : class
 			return _func();
 
 		var obj = Dyjector.Resolve<T>();
-		_func = Unsafe.As<Func<T>>(Dyjector.resolver[typeof(T)]);
+		_func = Unsafe.As<Func<T>>(Dyjector.resolvers[typeof(T)]);
 		return obj;
 	}
 

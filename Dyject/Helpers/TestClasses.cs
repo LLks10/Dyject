@@ -10,7 +10,7 @@ public sealed class TestEmpty
 public class TestMain : Depender<TestMain>
 {
 	public static ServiceB serviceB_test = new();
-	private ServiceA serviceA;
+	public ServiceA serviceA;
 	public ServiceB serviceB;
 }
 
@@ -19,14 +19,32 @@ public class ServiceA : Identifier
 {
 	public ServiceB serviceB;
 	public ServiceB serviceB2;
+	public ServiceD servD;
 }
 
 [Injectable]
 public class ServiceB : Identifier
 {
+	public ServiceC serC;
+}
+
+[Injectable(InjScope.Scoped)]
+public class ServiceC : Identifier
+{
 
 }
 
+[Injectable(InjScope.Scoped)]
+public class ServiceD : Identifier
+{
+	public ServiceE servE;
+}
+
+[Injectable]
+public class ServiceE : Identifier
+{
+
+}
 
 public abstract class Identifier
 {

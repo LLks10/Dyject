@@ -5,7 +5,7 @@ public class Injectable : Attribute
 {
 	public InjScope Scope { get; }
 
-	public Injectable(InjScope scope = InjScope.Scoped)
+	public Injectable(InjScope scope = InjScope.Transient)
 	{
 		Scope = scope;
 	}

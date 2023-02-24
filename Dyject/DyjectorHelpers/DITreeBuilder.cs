@@ -1,44 +1,109 @@
 ﻿using Dyject.Attributes;
-using Dyject.DyjectorHelpers;
+using Dyject.Exceptions;
+using System.Diagnostics;
 using System.Reflection;
 
-namespace Dyject.DyjecterHelpers;
+namespace Dyject.DyjectorHelpers;
 
-internal static class DITreeBuilder
+internal class DITreeBuilder
 {
 	public static List<DINode> BuildDITree(Type type)
 	{
-		HashSet<FieldInfo> visited = new();
-		List<DINode> nodes = new();
-		TopologicalSort(type, visited, nodes, 0);
+		DINode parent = new()
+		{
+			type = type,
+			depth = 0,
+			references = 0,
+		};
 
-		return nodes;
+		var self = new DITreeBuilder();
+		self.TopologicalSort(parent);
+		return self.nodes;
 	}
 
-	private static DINode TopologicalSort(Type current, HashSet<FieldInfo> visited, List<DINode> nodes, int depth)
-	{
-		var node = new DINode { type = current, depth = depth };
-		var scope = current.GetCustomAttribute<Injectable>();
-		if (scope is { } scp)
-			node.scope = scp.Scope;
+	readonly HashSet<FieldInfo> visited = new();
+	readonly Dictionary<Type, DINode> scope = new();
+	readonly List<DINode> nodes = new();
+	private DITreeBuilder() { }
 
-		var fields = current.GetFields(Dyjector.fieldsFlags);
+	private DINode TopologicalSort(DINode current)
+	{
+		var fields = current.type.GetFields(Dyjector.fieldsFlags);
 		foreach (var field in fields)
 		{
-			if (visited.Contains(field))
-				throw new Exception("cycle"); //TODO: improve error message
-			if (field.FieldType.GetCustomAttribute<Injectable>() is null)
+			// Guards
+			var attr = field.FieldType.GetCustomAttribute<Injectable>();
+			if (attr is null)
 				continue;
 			if (field.GetCustomAttribute<DontInject>() is not null)
 				continue;
+			if (field.FieldType == current.type)
+				throw new InvalidDependencyException($"Implementing self as dependency is not allowed. \"{current.type.FullName} -> {field.Name}\".");
+			if (visited.Contains(field))
+				CircularDependencyException.Throw(current);
 
 			visited.Add(field);
-			var child = TopologicalSort(field.FieldType, visited, nodes, depth + 1);
-			child.field = field;
-			node.children.Add(child);
+
+			var child = attr.Scope switch
+			{
+				InjScope.Transient	=> ResolveTransient(field, current),
+				InjScope.Scoped		=> ResolveScoped(field, current),
+				InjScope.Singleton	=> ResolveSingleton(field, current),
+				_					=> throw new UnreachableException(),
+			};
+
+			child.scope = attr.Scope;
+
+			current.children.Add(child);
+
+			visited.Remove(field);
 		}
 
-		nodes.Add(node); //TODO: Add check to avoid adding duplicate scopes and singletons
-		return node;
+		nodes.Add(current);
+		return current;
+	}
+
+	private DINode ResolveTransient(FieldInfo field, DINode current)
+	{
+		var child = new DINode
+		{
+			depth = current.depth + 1,
+			parent = current,
+			field = field,
+			type = field.FieldType,
+			references = 1,
+		};
+		TopologicalSort(child);
+
+		return child;
+	}
+
+	private DINode ResolveScoped(FieldInfo field, DINode current)
+	{
+		if (scope.TryGetValue(field.FieldType, out var child))
+		{
+			child.references++;
+			return child;
+		}
+
+		child = new DINode
+		{
+			depth = current.depth + 1,
+			parent = current,
+			field = field,
+			type = field.FieldType,
+			references = 1,
+		};
+
+		scope[field.FieldType] = child;
+
+		TopologicalSort(child);
+
+		return child;
+	}
+
+	private DINode ResolveSingleton(FieldInfo field, DINode current)
+	{
+		throw new NotImplementedException();
 	}
 }

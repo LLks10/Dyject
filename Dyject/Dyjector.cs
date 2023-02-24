@@ -1,5 +1,4 @@
-﻿using Dyject.DyjecterHelpers;
-using Dyject.DyjectorHelpers;
+﻿using Dyject.DyjectorHelpers;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -7,7 +6,7 @@ namespace Dyject;
 
 public static class Dyjector
 {
-    internal static readonly Dictionary<Type, Func<object>> resolver = new();
+    internal static readonly Dictionary<Type, Func<object>> resolvers = new();
 
     internal const string methodNameConst = "djct_ctor_";
     internal const BindingFlags fieldsFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
@@ -15,7 +14,7 @@ public static class Dyjector
 	public static T Resolve<T>() where T : class => (T)Resolve(typeof(T));
     public static object Resolve(Type type)
     {
-        if (resolver.TryGetValue(type, out Func<object>? func))
+        if (resolvers.TryGetValue(type, out Func<object>? func))
             return func();
 
         var tree = DITreeBuilder.BuildDITree(type);
@@ -25,7 +24,7 @@ public static class Dyjector
         DIResolver.ResolveDI(method, tree);
 
 		var ctor = method.CreateDelegate<Func<object>>();
-		resolver.Add(type, ctor);
+		resolvers.Add(type, ctor);
 
 		return ctor();
     }
@@ -50,5 +49,5 @@ public static class Dyjector
         throw new NotImplementedException();
     }
 
-    internal static void Reset() => resolver.Clear();
+    internal static void Reset() => resolvers.Clear();
 }
