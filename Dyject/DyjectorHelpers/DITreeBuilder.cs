@@ -31,7 +31,6 @@ internal class DITreeBuilder
 		var fields = current.type.GetFields(Dyjector.fieldsFlags);
 		foreach (var field in fields)
 		{
-			// Guards
 			var attr = field.FieldType.GetCustomAttribute<Injectable>();
 			if (attr is null)
 				continue;
@@ -104,6 +103,15 @@ internal class DITreeBuilder
 
 	private DINode ResolveSingleton(FieldInfo field, DINode current)
 	{
-		throw new NotImplementedException();
+		var child = new DINode
+		{
+			depth = current.depth + 1,
+			parent = current,
+			type = field.FieldType,
+			references = 1,
+			scope = InjScope.Singleton,
+		};
+
+		return child;
 	}
 }

@@ -53,6 +53,10 @@ internal class DIResolver
 				case InjScope.Scoped:
 					ProbeScope(node, depth + 1);
 					break;
+
+				case InjScope.Singleton:
+					Dyjector.GetSingleton(node.type, ilgen);
+					break;
 			}
 
 			ilgen.Stfld(field);
@@ -70,20 +74,20 @@ internal class DIResolver
 			return;
 		}
 
+		Resolve(child, depth);
+
+		if (child.references == 1)
+			return;
+
 		if (locals.Count >= ushort.MaxValue)
 			throw new InvalidOperationException("Too large dependency tree");
 
-		Resolve(child, depth);
+		var loc = ilgen.DeclareLocal(typeof(object));
+		Debug.Assert(loc.LocalIndex == locals.Count);
 
-		if(child.references > 1)
-		{
-			var loc = ilgen.DeclareLocal(child.type);
-			Debug.Assert(loc.LocalIndex == locals.Count);
-
-			ilgen
-				.Dup()
-				.Stloc(locals.Count);
-		}
+		ilgen
+			.Dup()
+			.Stloc(locals.Count);
 
 		locals.Add(child);
 	}

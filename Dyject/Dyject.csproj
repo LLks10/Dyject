@@ -18,5 +18,9 @@
       <_Parameter1>Dyject.Tests</_Parameter1>
     </AssemblyAttribute>
   </ItemGroup>
+  
+  <ItemGroup>
+    <PackageReference Include="BenchmarkDotNet" Version="0.13.5" />
+  </ItemGroup>
 
 </Project>

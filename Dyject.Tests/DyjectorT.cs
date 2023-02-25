@@ -2,7 +2,7 @@ using FluentAssertions;
 
 namespace Dyject.Tests;
 
-public class DyjectT : IDisposable
+public class DyjectorT : IDisposable
 {
 	public void Dispose() => Helper.Reset();
 

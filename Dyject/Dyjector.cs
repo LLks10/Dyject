@@ -1,4 +1,5 @@
 ﻿using Dyject.DyjectorHelpers;
+using Dyject.Extensions;
 using System.Reflection;
 using System.Reflection.Emit;
 
@@ -10,6 +11,11 @@ public static class Dyjector
 
     internal const string methodNameConst = "djct_ctor_";
     internal const BindingFlags fieldsFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
+
+    private static readonly Dictionary<Type, int> singletonMap = new();
+    private static readonly List<object> singletons = new();
+    private static readonly FieldInfo SingletonField = typeof(Dyjector).GetField(nameof(singletons), BindingFlags.NonPublic | BindingFlags.Static)!;
+    private static readonly MethodInfo IndexList = typeof(List<object>).GetMethod("get_Item")!;
 
 	public static T Resolve<T>() where T : class => (T)Resolve(typeof(T));
     public static object Resolve(Type type)
@@ -29,6 +35,21 @@ public static class Dyjector
 		return ctor();
     }
 
+    internal static ILGenerator GetSingleton(Type type, ILGenerator ilgen)
+    {
+        if(!singletonMap.TryGetValue(type, out var idx))
+        {
+			object obj = ResolveSingleton(type);
+			singletonMap[type] = singletons.Count;
+			idx = singletons.Count;
+			singletons.Add(obj);
+		}
+
+        return ilgen
+            .Ldsfld(SingletonField)
+            .Ldc(idx)
+            .Callvirt(IndexList);
+	}
 
     // Allow registering instantiations to be limited to instantiation of specified type?
     // Allow specifying specific instantiation using attribute on field
@@ -48,6 +69,16 @@ public static class Dyjector
         // Singleton constructor?
         throw new NotImplementedException();
     }
-
     internal static void Reset() => resolvers.Clear();
+
+    private static object ResolveSingleton(Type type)
+    {
+		var tree = DITreeBuilder.BuildDITree(type);
+
+		var method = new DynamicMethod($"{methodNameConst}{type.Name}", type, Array.Empty<Type>());
+
+		DIResolver.ResolveDI(method, tree);
+
+		return method.CreateDelegate<Func<object>>()();
+	}
 }
