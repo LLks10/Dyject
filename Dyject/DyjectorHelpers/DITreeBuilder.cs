@@ -17,7 +17,7 @@ internal class DITreeBuilder
 		};
 
 		var self = new DITreeBuilder();
-		self.TopologicalSort(parent);
+		self.TopologicalSort(parent, InjScope.Transient);
 		return self.nodes;
 	}
 
@@ -26,7 +26,7 @@ internal class DITreeBuilder
 	readonly List<DINode> nodes = new();
 	private DITreeBuilder() { }
 
-	private DINode TopologicalSort(DINode current)
+	private DINode TopologicalSort(DINode current, InjScope currentScope)
 	{
 		var fields = current.type.GetFields(Dyjector.fieldsFlags);
 		foreach (var field in fields)
@@ -44,17 +44,17 @@ internal class DITreeBuilder
 
 			visited.Add(field);
 
-			var child = attr.Scope switch
-			{
-				InjScope.Transient	=> ResolveTransient(field, current),
-				InjScope.Scoped		=> ResolveScoped(field, current),
-				InjScope.Singleton	=> ResolveSingleton(field, current),
-				_					=> throw new UnreachableException(),
-			};
+			var child = currentScope > attr.Scope 
+				? ResolveTransient(field, current, currentScope)
+				: attr.Scope switch
+				{
+					InjScope.Transient => ResolveTransient(field, current, InjScope.Transient),
+					InjScope.Scoped => ResolveScoped(field, current),
+					InjScope.Singleton => ResolveSingleton(field, current),
+					_ => throw new UnreachableException()
+				};
 
-			child.scope = attr.Scope;
-
-			current.children.Add(child);
+			current.children.Add((field, child));
 
 			visited.Remove(field);
 		}
@@ -63,17 +63,17 @@ internal class DITreeBuilder
 		return current;
 	}
 
-	private DINode ResolveTransient(FieldInfo field, DINode current)
+	private DINode ResolveTransient(FieldInfo field, DINode current, InjScope currentScope)
 	{
 		var child = new DINode
 		{
 			depth = current.depth + 1,
 			parent = current,
-			field = field,
 			type = field.FieldType,
 			references = 1,
+			scope = InjScope.Transient,
 		};
-		TopologicalSort(child);
+		TopologicalSort(child, currentScope);
 
 		return child;
 	}
@@ -90,14 +90,14 @@ internal class DITreeBuilder
 		{
 			depth = current.depth + 1,
 			parent = current,
-			field = field,
 			type = field.FieldType,
 			references = 1,
+			scope = InjScope.Scoped,
 		};
 
 		scope[field.FieldType] = child;
 
-		TopologicalSort(child);
+		TopologicalSort(child, InjScope.Scoped);
 
 		return child;
 	}

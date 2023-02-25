@@ -37,19 +37,21 @@ internal class DIResolver
 
 		foreach(var child in current.children)
 		{
-			var field = child.field;
+			var field = child.Field;
 			Debug.Assert(field != null);
+
+			var node = child.Node;
 
 			ilgen.Dup();
 
-			switch (child.scope)
+			switch (node.scope)
 			{
 				case InjScope.Transient:
-					Resolve(child, depth + 1);
+					Resolve(node, depth + 1);
 					break;
 
 				case InjScope.Scoped:
-					ProbeScope(child, depth + 1);
+					ProbeScope(node, depth + 1);
 					break;
 			}
 
@@ -73,10 +75,15 @@ internal class DIResolver
 
 		Resolve(child, depth);
 
-		ilgen.DeclareLocal(child.type);
-		ilgen
-			.Dup()
-			.Stloc((ushort)locals.Count);
+		if(child.references > 1)
+		{
+			var loc = ilgen.DeclareLocal(child.type);
+			Debug.Assert(loc.LocalIndex == locals.Count);
+
+			ilgen
+				.Dup()
+				.Stloc(locals.Count);
+		}
 
 		locals.Add(child);
 	}
