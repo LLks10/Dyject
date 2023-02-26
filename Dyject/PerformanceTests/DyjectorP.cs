@@ -5,7 +5,7 @@ using Dyject.Helpers;
 namespace Dyject.Performance;
 
 
-public class DyjectorP
+internal class DyjectorP
 {
 	public static void RunPerfTest()
 	{

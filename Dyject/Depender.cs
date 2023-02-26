@@ -1,4 +1,5 @@
-﻿using System.Runtime.CompilerServices;
+﻿using Dyject.Extensions;
+using System.Runtime.CompilerServices;
 
 namespace Dyject;
 
@@ -23,7 +24,7 @@ public abstract class Depender<T> where T : class
 			return _func();
 
 		var obj = Dyjector.Resolve<T>();
-		_func = Unsafe.As<Func<T>>(Dyjector.resolvers[typeof(T)]);
+		_func = Dyjector.resolvers[typeof(T)].As<Func<T>>();
 		return obj;
 	}
 

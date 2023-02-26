@@ -2,6 +2,7 @@
 using Dyject.Extensions;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Runtime.CompilerServices;
 
 namespace Dyject;
 
@@ -14,10 +15,11 @@ public static class Dyjector
 
     private static readonly Dictionary<Type, int> singletonMap = new();
     private static readonly List<object> singletons = new();
+
     private static readonly FieldInfo SingletonField = typeof(Dyjector).GetField(nameof(singletons), BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly MethodInfo IndexList = typeof(List<object>).GetMethod("get_Item")!;
 
-	public static T Resolve<T>() where T : class => (T)Resolve(typeof(T));
+	public static T Resolve<T>() where T : class => Resolve(typeof(T)).As<T>();
     public static object Resolve(Type type)
     {
         if (resolvers.TryGetValue(type, out Func<object>? func))
@@ -51,10 +53,18 @@ public static class Dyjector
             .Callvirt(IndexList);
 	}
 
-    // Allow registering instantiations to be limited to instantiation of specified type?
-    // Allow specifying specific instantiation using attribute on field
-    // When encountering type T -> instantiate U
-    public static bool RegisterInstantiation<T, U>() where U : T
+	internal static object TryGetSingleton(Type type)
+	{
+        if (!singletonMap.TryGetValue(type, out var idx))
+            throw new InvalidOperationException($"Type \"{type.FullName}\" isnt a singleton");
+
+		return singletons[idx];
+	}
+
+	// Allow registering instantiations to be limited to instantiation of specified type?
+	// Allow specifying specific instantiation using attribute on field
+	// When encountering type T -> instantiate U
+	public static bool RegisterInstantiation<T, U>() where U : T
     {
         throw new NotImplementedException();
     }
@@ -69,7 +79,12 @@ public static class Dyjector
         // Singleton constructor?
         throw new NotImplementedException();
     }
-    internal static void Reset() => resolvers.Clear();
+    internal static void Reset()
+    {
+        resolvers.Clear();
+        singletonMap.Clear();
+        singletons.Clear();
+    }
 
     private static object ResolveSingleton(Type type)
     {
