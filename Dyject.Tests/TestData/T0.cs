@@ -9,7 +9,7 @@ public sealed class TestEmpty : Identifier
 	int a, b, c;
 }
 
-public class T0Main : Depender<T0Main>
+public class T0Main
 {
 	public T0TrA tr0;
 	public T0TrB tr1;

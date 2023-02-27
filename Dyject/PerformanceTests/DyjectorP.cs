@@ -13,7 +13,7 @@ internal class DyjectorP
 	}
 
 	[GlobalSetup(Target = nameof(Dyject))]
-	public void Setup() => TestMain.Create();
+	public void Setup() => Dyjector<TestMain>.Init();
 
 	[Benchmark]
 	public TestMain Manual()
@@ -45,6 +45,6 @@ internal class DyjectorP
 	[Benchmark]
 	public TestMain Dyject()
 	{
-		return TestMain.Create();
+		return Dyjector<TestMain>.Create();
 	}
 }

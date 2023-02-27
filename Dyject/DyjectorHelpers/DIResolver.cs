@@ -7,7 +7,7 @@ namespace Dyject.DyjectorHelpers;
 
 internal class DIResolver
 {
-	public static DynamicMethod ResolveDI(DynamicMethod method, List<DINode> nodes)
+	public static Func<object> ResolveDI(DynamicMethod method, List<DINode> nodes)
 	{
 		DINode parent = nodes[^1];
 		var ilgen = method.GetILGenerator();
@@ -16,7 +16,20 @@ internal class DIResolver
 		self.Resolve(parent, 0);
 		ilgen.Ret();
 
-		return method;
+		return method.CreateDelegate<Func<object>>();
+	}
+
+	public static Action<object> ResolveDI4Ctor(DynamicMethod method, List<DINode> nodes)
+	{
+		DINode parent = nodes[^1];
+		var ilgen = method.GetILGenerator();
+
+		var self = new DIResolver(ilgen);
+		self.Resolve(parent, 0, true);
+		ilgen.Pop();
+		ilgen.Ret();
+
+		return method.CreateDelegate<Action<object>>();
 	}
 
 	readonly ILGenerator ilgen;
@@ -26,15 +39,24 @@ internal class DIResolver
 		this.ilgen = ilgen;
 	}
 
-	private void Resolve(DINode current, int depth)
+	private void Resolve(DINode current, int depth, bool getObjFromArg = false)
 	{
-		var ctors = current.type.GetConstructors();
-		if (ctors.Length > 1)
-			throw new NotImplementedException("Services with multiple constructors not implemented");
+		// Create current object
+		if (!getObjFromArg)
+		{
+			var ctors = current.type.GetConstructors();
+			if (ctors.Length > 1)
+				throw new NotImplementedException("Services with multiple constructors not implemented");
 
-		var ctor = ctors[0];
-		ilgen.Newobj(ctor);
+			var ctor = ctors[0];
+			ilgen.Newobj(ctor);
+		}
+		else
+		{
+			ilgen.Ldarg(0);
+		}
 
+		// Recursively iterate over children
 		foreach(var child in current.children)
 		{
 			var field = child.Field;

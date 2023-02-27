@@ -8,7 +8,7 @@ public static class Helper
 	{
 		Dyjector.Reset();
 		Identifier.ResetId();
-		Depender<T0Main>.Reset();
+		Dyjector<T0Main>.Reset();
 	}
 }
 

@@ -7,7 +7,7 @@ internal sealed class TestEmpty
 	int a, b, c;
 }
 
-internal class TestMain : Depender<TestMain>
+internal class TestMain : Depender
 {
 	public static ServiceB serviceB_test = new();
 	public ServiceA serviceA;

@@ -88,6 +88,8 @@ internal static class ILGeneratorExtensions
 
 	public static ILGenerator Newobj(this ILGenerator il, ConstructorInfo arg) { il.Emit(OpCodes.Newobj, arg); return il; }
 
+	public static ILGenerator Pop(this ILGenerator il) { il.Emit(OpCodes.Pop); return il; }
+
 	public static ILGenerator Ret(this ILGenerator il) { il.Emit(OpCodes.Ret); return il; }
 
 	public static ILGenerator Stfld(this ILGenerator il, FieldInfo arg) { il.Emit(OpCodes.Stfld, arg); return il; }
