@@ -3,7 +3,6 @@ using Dyject.Extensions;
 using System.Diagnostics;
 using System.Reflection;
 using System.Reflection.Emit;
-using System.Runtime.CompilerServices;
 
 namespace Dyject;
 
@@ -11,12 +10,11 @@ public static class Dyjector
 {
     internal static readonly Dictionary<Type, Func<object>> resolvers = new();
 	internal static readonly Dictionary<Type, Action<object>> ctorResolvers = new();
+	private static readonly Dictionary<Type, int> singletonMap = new();
+	private static readonly List<object> singletons = new();
 
 	internal const string methodNameConst = "djct_ctor_";
     internal const BindingFlags fieldsFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-
-    private static readonly Dictionary<Type, int> singletonMap = new();
-    private static readonly List<object> singletons = new();
 
     private static readonly FieldInfo SingletonField = typeof(Dyjector).GetField(nameof(singletons), BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly MethodInfo IndexList = typeof(List<object>).GetMethod("get_Item")!;
@@ -74,11 +72,15 @@ public static class Dyjector
         throw new NotImplementedException();
     }
 
-    public static bool RegisterSingleton<T>(T obj)
+    public static void RegisterSingleton<T>(T obj)
     {
-        // Singleton constructor?
-        throw new NotImplementedException();
-    }
+		if (singletonMap.ContainsKey(typeof(T)))
+			throw new InvalidOperationException($"'{typeof(T)}' already has a singleton registered");
+
+		singletonMap[typeof(T)] = singletons.Count;
+		singletons.Add(obj);
+	}
+
     // Initialize all Dyjector<T>'s
     public static void InitAll()
     {

@@ -1,4 +1,4 @@
-﻿using Dyject.Tests.TestData;
+﻿using Dyject.Tests.TestData.Dyjector;
 
 namespace Dyject.Tests;
 
@@ -9,6 +9,9 @@ public static class Helper
 		Dyjector.Reset();
 		Identifier.ResetId();
 		Dyjector<T0Main>.Reset();
+		Dyjector<ShSiMain0>.Reset();
+		Dyjector<ShSiMain1>.Reset();
+		Dyjector<Circ>.Reset();
 	}
 }
 

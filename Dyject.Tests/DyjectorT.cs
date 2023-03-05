@@ -1,13 +1,14 @@
 using Dyject.Exceptions;
 using Dyject.Tests.Helpers;
-using Dyject.Tests.TestData;
+using Dyject.Tests.TestData.Dyjector;
 using FluentAssertions;
 
 namespace Dyject.Tests;
 
+[Collection("Dyject")]
 public class DyjectorT : IDisposable
 {
-	public void Dispose() => Helper.Reset();
+	void IDisposable.Dispose() => Helper.Reset();
 
 	[Fact]
 	public void EmptyObject()
