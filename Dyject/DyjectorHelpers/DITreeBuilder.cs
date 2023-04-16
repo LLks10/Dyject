@@ -28,11 +28,19 @@ internal class DITreeBuilder
 
 	private DINode TopologicalSort(DINode current, InjScope currentScope)
 	{
+		var ctor = GetConstructor(current.type);
+		current.ctor = ctor;
+		var paras = ctor.GetParameters();
+
 		var fields = current.type.GetFields(Dyjector.fieldsFlags);
 		foreach (var field in fields)
 		{
-			var attr = field.FieldType.GetCustomAttribute<Injectable>();
-			if (attr is null)
+			var scope = field.FieldType.GetCustomAttribute<Injectable>()?.Scope;
+
+			if (Dyjector.singletonMap.ContainsKey(field.FieldType))
+				scope = InjScope.Singleton;
+
+			if (scope is null)
 				continue;
 			if (field.GetCustomAttribute<DontInject>() is not null)
 				continue;
@@ -43,9 +51,9 @@ internal class DITreeBuilder
 
 			visited.Add(field);
 
-			var child = currentScope > attr.Scope 
+			var child = currentScope > scope
 				? ResolveTransient(field, current, currentScope)
-				: attr.Scope switch
+				: scope switch
 				{
 					InjScope.Transient => ResolveTransient(field, current, InjScope.Transient),
 					InjScope.Scoped => ResolveScoped(field, current),
@@ -113,5 +121,36 @@ internal class DITreeBuilder
 		};
 
 		return child;
+	}
+
+	private ConstructorInfo GetConstructor(Type type)
+	{
+		var t = ResolveType(type);
+
+
+		var ctors = type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+		return ctors[0];
+	}
+
+	private Type ResolveType(Type type)
+	{
+		if (Dyjector.instantiations.TryGetValue(type, out var st))
+			return st;
+		
+		if (type.IsInterface)
+		{
+			var subTypes = AppDomain.CurrentDomain.GetAssemblies()
+				.SelectMany(s => s.GetTypes())
+				.Where(p => !p.IsInterface && type.IsAssignableFrom(p));
+
+			var c = subTypes.Count();
+			if (c == 0)
+				throw new InvalidOperationException($"No instantiation of interface '{type.FullName}' found.");
+			if (c > 1)
+				throw new InvalidOperationException($"Multiple instantiations of interface '{type.FullName}' found. Specify which instantiation to use with '{nameof(Dyjector.RegisterInstantiation)}'.");
+			return subTypes.First();
+		}
+
+		return type;
 	}
 }

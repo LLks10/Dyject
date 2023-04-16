@@ -44,11 +44,8 @@ internal class DIResolver
 		// Create current object
 		if (!getObjFromArg)
 		{
-			var ctors = current.type.GetConstructors();
-			if (ctors.Length > 1)
-				throw new NotImplementedException("Services with multiple constructors not implemented");
+			var ctor = current.ctor;
 
-			var ctor = ctors[0];
 			ilgen.Newobj(ctor);
 		}
 		else
@@ -102,7 +99,7 @@ internal class DIResolver
 			return;
 
 		if (locals.Count >= ushort.MaxValue)
-			throw new InvalidOperationException("Too large dependency tree");
+			throw new InvalidOperationException("Too many scoped services loaded");
 
 		var loc = ilgen.DeclareLocal(typeof(object));
 		Debug.Assert(loc.LocalIndex == locals.Count);

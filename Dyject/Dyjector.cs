@@ -10,7 +10,8 @@ public static class Dyjector
 {
     internal static readonly Dictionary<Type, Func<object>> resolvers = new();
 	internal static readonly Dictionary<Type, Action<object>> ctorResolvers = new();
-	private static readonly Dictionary<Type, int> singletonMap = new();
+	internal static readonly Dictionary<Type, int> singletonMap = new();
+	internal static readonly Dictionary<Type, Type> instantiations = new();
 	private static readonly List<object> singletons = new();
 
 	internal const string methodNameConst = "djct_ctor_";
@@ -59,18 +60,19 @@ public static class Dyjector
 		return ctor;
 	}
 
-	// Allow registering instantiations to be limited to instantiation of specified type?
-	// Allow specifying specific instantiation using attribute on field
-	// When encountering type T -> instantiate U
-	public static bool RegisterInstantiation<T, U>() where U : T
+	public static void RegisterInstantiation<T, U>() where U : class, T
+													 where T : class
     {
-        throw new NotImplementedException();
-    }
-    // When encountering type T -> instantiate to value 
-    public static bool RegisterInstantiation<T>(T value)
-    {
-        throw new NotImplementedException();
-    }
+		var u = typeof(U);
+		if (u.IsInterface || u.IsAbstract)
+			throw new ArgumentException($"{typeof(U).FullName} can't be an interface or abstract");
+		var t = typeof(T);
+
+		if(instantiations.ContainsKey(t))
+			throw new InvalidOperationException($"'{typeof(T)}' already has an instantiation registered");
+
+		instantiations[t] = u;
+	}
 
     public static void RegisterSingleton<T>(T obj)
     {
@@ -117,6 +119,7 @@ public static class Dyjector
 		ctorResolvers.Clear();
         singletonMap.Clear();
         singletons.Clear();
+		instantiations.Clear();
     }
 
     private static object ResolveSingleton(Type type)
