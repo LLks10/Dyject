@@ -44,9 +44,7 @@ internal class DIResolver
 		// Create current object
 		if (!getObjFromArg)
 		{
-			var ctor = current.ctor;
-
-			ilgen.Newobj(ctor);
+			CreateObject(current);
 		}
 		else
 		{
@@ -80,6 +78,26 @@ internal class DIResolver
 
 			ilgen.Stfld(field);
 		}
+	}
+
+	private void CreateObject(DINode current)
+	{
+		var ctor = current.ctor;
+
+		var pars = ctor.GetParameters();
+		foreach(var p in pars)
+		{
+			// TODO: Construct service for constructor argument
+
+			// Set default value
+			if (p.HasDefaultValue)
+			{
+				HandleDefaultValue(p.ParameterType, p.DefaultValue);
+				continue;
+			}
+		}
+
+		ilgen.Newobj(ctor);
 	}
 
 	private void ProbeScope(DINode child, int depth)
@@ -119,5 +137,67 @@ internal class DIResolver
 				return i;
 		}
 		return null;
+	}
+
+	private void HandleDefaultValue(Type type, object value)
+	{
+		if (type.IsEnum)
+		{
+			type = Enum.GetUnderlyingType(type);
+		}
+		if (value is null)
+		{
+			ilgen.Ldnull();
+			return;
+		}
+		if(type == typeof(string))
+		{
+			ilgen.Ldstr((string)value);
+			return;
+		}
+		if (type == typeof(int))
+		{
+			ilgen.Ldc((int)value);
+			return;
+		}
+		if (type == typeof(uint))
+		{
+			ilgen.Ldc((uint)value);
+			return;
+		}
+		if (type == typeof(long))
+		{
+			ilgen.Ldc((long)value);
+			return;
+		}
+		if (type == typeof(ulong))
+		{
+			ilgen.Ldc((ulong)value);
+			return;
+		}
+		if (type == typeof(char))
+		{
+			ilgen.Ldc((char)value);
+			return;
+		}
+		if(type == typeof(sbyte))
+		{
+			ilgen.Ldc((sbyte)value);
+		}
+		if(type == typeof(byte))
+		{
+			ilgen.Ldc((byte)value);
+		}
+		if (type == typeof(float))
+		{
+			ilgen.Ldc((float)value);
+			return;
+		}
+		if (type == typeof(double))
+		{
+			ilgen.Ldc((double)value);
+			return;
+		}
+		throw new NotSupportedException($"Default parameter value of type '{type.FullName}' is not supported.");
 	}
 }

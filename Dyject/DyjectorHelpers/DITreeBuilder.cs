@@ -28,9 +28,9 @@ internal class DITreeBuilder
 
 	private DINode TopologicalSort(DINode current, InjScope currentScope)
 	{
+		// TODO: Find services delivered by constructor and ignore them in field DI
 		var ctor = GetConstructor(current.type);
 		current.ctor = ctor;
-		var paras = ctor.GetParameters();
 
 		var fields = current.type.GetFields(Dyjector.fieldsFlags);
 		foreach (var field in fields)
@@ -126,10 +126,52 @@ internal class DITreeBuilder
 	private ConstructorInfo GetConstructor(Type type)
 	{
 		var t = ResolveType(type);
+		var ctors = t.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
+		if (ctors.Length == 0)
+			throw new InvalidOperationException($"Can't find a constructor for '{type.FullName}'");
 
-		var ctors = type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
-		return ctors[0];
+		if (ctors.Length == 1)
+			return ctors[0];
+
+		// Try to find preferred ctor by attribute
+		foreach(var ctor in ctors)
+		{
+			if (ctor.GetCustomAttribute<InjectionConstructor>() is not null)
+				return ctor;
+		}
+
+		// Get valid constructor with most arguments
+		int bestScore = -1;
+		int bestIdx = -1;
+		for(int i = 0; i < ctors.Length; i++)
+		{
+			var pars = ctors[i].GetParameters();
+			int score = 0;
+			foreach(var p in pars)
+			{
+				// Check if constructor is valid
+				if(!p.HasDefaultValue && p.GetCustomAttribute<Injectable>() is null && !Dyjector.singletonMap.ContainsKey(p.ParameterType))
+				{
+					score = -1;
+					break;
+				}
+
+				if(!p.HasDefaultValue)
+					score++;
+			}
+			
+			if(score > bestScore)
+			{
+				bestScore = score;
+				bestIdx = i;
+			}
+		}
+
+		if (bestIdx == -1)
+			throw new InvalidOperationException($"No usable constructors found for '{t.FullName}'.");
+
+		return ctors[bestIdx];
 	}
 
 	private Type ResolveType(Type type)
