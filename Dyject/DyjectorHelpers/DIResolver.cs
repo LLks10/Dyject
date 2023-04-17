@@ -7,25 +7,23 @@ namespace Dyject.DyjectorHelpers;
 
 internal class DIResolver
 {
-	public static Func<object> ResolveDI(DynamicMethod method, List<DINode> nodes)
+	public static Func<object> ResolveDI(DynamicMethod method, DINode node)
 	{
-		DINode parent = nodes[^1];
 		var ilgen = method.GetILGenerator();
 
 		var self = new DIResolver(ilgen);
-		self.Resolve(parent);
+		self.Resolve(node);
 		ilgen.Ret();
 
 		return method.CreateDelegate<Func<object>>();
 	}
 
-	public static Action<object> ResolveDI4Ctor(DynamicMethod method, List<DINode> nodes)
+	public static Action<object> ResolveDI4Ctor(DynamicMethod method, DINode node)
 	{
-		DINode parent = nodes[^1];
 		var ilgen = method.GetILGenerator();
 
 		var self = new DIResolver(ilgen);
-		self.Resolve(parent, true);
+		self.Resolve(node, true);
 		ilgen.Pop();
 		ilgen.Ret();
 

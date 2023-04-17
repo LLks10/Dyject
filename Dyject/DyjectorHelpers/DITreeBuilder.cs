@@ -7,7 +7,7 @@ namespace Dyject.DyjectorHelpers;
 
 internal class DITreeBuilder
 {
-	public static List<DINode> BuildDITree(Type type)
+	public static DINode BuildDITree(Type type)
 	{
 		DINode parent = new()
 		{
@@ -17,24 +17,20 @@ internal class DITreeBuilder
 		};
 
 		var self = new DITreeBuilder();
-		self.TopologicalSort(parent, InjScope.Transient);
-		return self.nodes;
+		self.BuildTree(parent, InjScope.Transient);
+		return parent;
 	}
 
 	readonly HashSet<object> visited = new();
 	readonly Dictionary<Type, DINode> scope = new();
-	readonly List<DINode> nodes = new();
 	private DITreeBuilder() { }
 
-	private DINode TopologicalSort(DINode current, InjScope currentScope)
+	private DINode BuildTree(DINode current, InjScope currentScope)
 	{
-		// TODO: Find services delivered by constructor and ignore them in field DI
-
 		ConstructorInjection(current, currentScope);
 
 		FieldInjection(current, currentScope);
 
-		nodes.Add(current);
 		return current;
 	}
 
@@ -125,7 +121,7 @@ internal class DITreeBuilder
 			references = 1,
 			scope = InjScope.Transient,
 		};
-		TopologicalSort(child, currentScope);
+		BuildTree(child, currentScope);
 
 		return child;
 	}
@@ -149,7 +145,7 @@ internal class DITreeBuilder
 
 		scope[type] = child;
 
-		TopologicalSort(child, InjScope.Scoped);
+		BuildTree(child, InjScope.Scoped);
 
 		return child;
 	}
