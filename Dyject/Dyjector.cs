@@ -14,11 +14,11 @@ public static class Dyjector
 	internal static readonly Dictionary<Type, Type> instantiations = new();
 	private static readonly List<object> singletons = new();
 
-	internal const string methodNameConst = "djct_ctor_";
-    internal const BindingFlags fieldsFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
-
     private static readonly FieldInfo SingletonField = typeof(Dyjector).GetField(nameof(singletons), BindingFlags.NonPublic | BindingFlags.Static)!;
     private static readonly MethodInfo IndexList = typeof(List<object>).GetMethod("get_Item")!;
+
+	internal const string methodNameConst = "djct_ctor_";
+    internal const BindingFlags fieldsFlags = BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance;
 
 	public static T Resolve<T>() where T : class => Resolve(typeof(T)).As<T>();
     public static object Resolve(Type type)
@@ -69,12 +69,23 @@ public static class Dyjector
 		var t = typeof(T);
 
 		if(instantiations.ContainsKey(t))
-			throw new InvalidOperationException($"'{typeof(T)}' already has an instantiation registered");
+			throw new InvalidOperationException($"'{typeof(T).FullName}' already has an instantiation registered");
 
 		instantiations[t] = u;
 	}
 
-    public static void RegisterSingleton<T>(T obj)
+	public static void RegisterInstantiation(Type @abstract, Type instantiation)
+	{
+		if (instantiation.IsInterface || instantiation.IsAbstract)
+			throw new ArgumentException($"{instantiation.FullName} can't be an interface or abstract");
+
+		if (instantiations.ContainsKey(@abstract))
+			throw new InvalidOperationException($"'{@abstract.FullName}' already has an instantiation registered");
+
+		instantiations[@abstract] = instantiation;
+	}
+
+	public static void RegisterSingleton<T>(T obj)
     {
 		if (singletonMap.ContainsKey(typeof(T)))
 			throw new InvalidOperationException($"'{typeof(T)}' already has a singleton registered");

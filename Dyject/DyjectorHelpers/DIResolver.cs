@@ -13,7 +13,7 @@ internal class DIResolver
 		var ilgen = method.GetILGenerator();
 
 		var self = new DIResolver(ilgen);
-		self.Resolve(parent, 0);
+		self.Resolve(parent);
 		ilgen.Ret();
 
 		return method.CreateDelegate<Func<object>>();
@@ -25,7 +25,7 @@ internal class DIResolver
 		var ilgen = method.GetILGenerator();
 
 		var self = new DIResolver(ilgen);
-		self.Resolve(parent, 0, true);
+		self.Resolve(parent, true);
 		ilgen.Pop();
 		ilgen.Ret();
 
@@ -39,7 +39,7 @@ internal class DIResolver
 		this.ilgen = ilgen;
 	}
 
-	private void Resolve(DINode current, int depth, bool getObjFromArg = false)
+	private void Resolve(DINode current, bool getObjFromArg = false)
 	{
 		// Create current object
 		if (!getObjFromArg)
@@ -64,11 +64,11 @@ internal class DIResolver
 			switch (node.scope)
 			{
 				case InjScope.Transient:
-					Resolve(node, depth + 1);
+					Resolve(node);
 					break;
 
 				case InjScope.Scoped:
-					ProbeScope(node, depth + 1);
+					ProbeScope(node);
 					break;
 
 				case InjScope.Singleton:
@@ -84,23 +84,35 @@ internal class DIResolver
 	{
 		var ctor = current.ctor;
 
-		var pars = ctor.GetParameters();
-		foreach(var p in pars)
+		foreach((var param, var node) in current.args)
 		{
-			// TODO: Construct service for constructor argument
-
 			// Set default value
-			if (p.HasDefaultValue)
+			if (param.HasDefaultValue)
 			{
-				HandleDefaultValue(p.ParameterType, p.DefaultValue);
+				HandleDefaultValue(param.ParameterType, param.DefaultValue);
 				continue;
+			}
+
+			switch (node.scope)
+			{
+				case InjScope.Transient:
+					Resolve(node);
+					break;
+
+				case InjScope.Scoped:
+					ProbeScope(node);
+					break;
+
+				case InjScope.Singleton:
+					Dyjector.GetSingleton(node.type, ilgen);
+					break;
 			}
 		}
 
 		ilgen.Newobj(ctor);
 	}
 
-	private void ProbeScope(DINode child, int depth)
+	private void ProbeScope(DINode child)
 	{
 		Debug.Assert(child.scope == InjScope.Scoped);
 
@@ -111,7 +123,7 @@ internal class DIResolver
 			return;
 		}
 
-		Resolve(child, depth);
+		Resolve(child);
 
 		if (child.references == 1)
 			return;
@@ -174,6 +186,14 @@ internal class DIResolver
 		{
 			ilgen.Ldc((ulong)value);
 			return;
+		}
+		if (type == typeof(short))
+		{
+			ilgen.Ldc((short)value);
+		}
+		if (type == typeof(ushort))
+		{
+			ilgen.Ldc((ushort)value);
 		}
 		if (type == typeof(char))
 		{

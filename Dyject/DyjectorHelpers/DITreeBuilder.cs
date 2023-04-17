@@ -21,7 +21,7 @@ internal class DITreeBuilder
 		return self.nodes;
 	}
 
-	readonly HashSet<FieldInfo> visited = new();
+	readonly HashSet<object> visited = new();
 	readonly Dictionary<Type, DINode> scope = new();
 	readonly List<DINode> nodes = new();
 	private DITreeBuilder() { }
@@ -29,10 +29,53 @@ internal class DITreeBuilder
 	private DINode TopologicalSort(DINode current, InjScope currentScope)
 	{
 		// TODO: Find services delivered by constructor and ignore them in field DI
-		var ctor = GetConstructor(current.type);
+
+		ConstructorInjection(current, currentScope);
+
+		FieldInjection(current, currentScope);
+
+		nodes.Add(current);
+		return current;
+	}
+
+	private void ConstructorInjection(DINode current, InjScope currentScope)
+	{
+		(var ctor, var pars) = GetConstructor(current);
 		current.ctor = ctor;
 
-		var fields = current.type.GetFields(Dyjector.fieldsFlags);
+		foreach (var par in pars)
+		{
+			if (par.HasDefaultValue)
+			{
+				current.args.Add((par, null));
+				continue;
+			}
+
+			var scope = par.ParameterType.GetCustomAttribute<Injectable>()?.Scope;
+
+			if (Dyjector.singletonMap.ContainsKey(par.ParameterType))
+				scope = InjScope.Singleton;
+
+			if (scope is null)
+				continue;
+			if (par.ParameterType == current.type)
+				throw new InvalidDependencyException($"Implementing self as dependency is not allowed. \"{current.type.FullName} -> {par.Name}\".");
+			if (visited.Contains(par))
+				CircularDependencyException.Throw(current);
+
+			visited.Add(par);
+
+			var child = ResolveChild(current, par.ParameterType, currentScope, scope);
+
+			current.args.Add((par, child));
+
+			visited.Remove(par);
+		}
+	}
+
+	private void FieldInjection(DINode current, InjScope currentScope)
+	{
+		var fields = GetInstantiation(current.type).GetFields(Dyjector.fieldsFlags);
 		foreach (var field in fields)
 		{
 			var scope = field.FieldType.GetCustomAttribute<Injectable>()?.Scope;
@@ -51,32 +94,34 @@ internal class DITreeBuilder
 
 			visited.Add(field);
 
-			var child = currentScope > scope
-				? ResolveTransient(field, current, currentScope)
-				: scope switch
-				{
-					InjScope.Transient => ResolveTransient(field, current, InjScope.Transient),
-					InjScope.Scoped => ResolveScoped(field, current),
-					InjScope.Singleton => ResolveSingleton(field, current),
-					_ => throw new UnreachableException()
-				};
+			var child = ResolveChild(current, field.FieldType, currentScope, scope);
 
 			current.children.Add((field, child));
 
 			visited.Remove(field);
 		}
-
-		nodes.Add(current);
-		return current;
 	}
 
-	private DINode ResolveTransient(FieldInfo field, DINode current, InjScope currentScope)
+	private DINode ResolveChild(DINode current, Type type, InjScope currentScope, InjScope? scope)
+	{
+		return currentScope > scope
+			? ResolveTransient(type, current, currentScope)
+			: scope switch
+			{
+				InjScope.Transient => ResolveTransient(type, current, InjScope.Transient),
+				InjScope.Scoped => ResolveScoped(type, current),
+				InjScope.Singleton => ResolveSingleton(type, current),
+				_ => throw new UnreachableException()
+			};
+	}
+
+	private DINode ResolveTransient(Type type, DINode current, InjScope currentScope)
 	{
 		var child = new DINode
 		{
 			depth = current.depth + 1,
 			parent = current,
-			type = field.FieldType,
+			type = type,
 			references = 1,
 			scope = InjScope.Transient,
 		};
@@ -85,9 +130,9 @@ internal class DITreeBuilder
 		return child;
 	}
 
-	private DINode ResolveScoped(FieldInfo field, DINode current)
+	private DINode ResolveScoped(Type type, DINode current)
 	{
-		if (scope.TryGetValue(field.FieldType, out var child))
+		if (scope.TryGetValue(type, out var child))
 		{
 			child.references++;
 			return child;
@@ -97,25 +142,25 @@ internal class DITreeBuilder
 		{
 			depth = current.depth + 1,
 			parent = current,
-			type = field.FieldType,
+			type = type,
 			references = 1,
 			scope = InjScope.Scoped,
 		};
 
-		scope[field.FieldType] = child;
+		scope[type] = child;
 
 		TopologicalSort(child, InjScope.Scoped);
 
 		return child;
 	}
 
-	private DINode ResolveSingleton(FieldInfo field, DINode current)
+	private DINode ResolveSingleton(Type type, DINode current)
 	{
 		var child = new DINode
 		{
 			depth = current.depth + 1,
 			parent = current,
-			type = field.FieldType,
+			type = type,
 			references = 1,
 			scope = InjScope.Singleton,
 		};
@@ -123,27 +168,29 @@ internal class DITreeBuilder
 		return child;
 	}
 
-	private ConstructorInfo GetConstructor(Type type)
+	private (ConstructorInfo Ctor, ParameterInfo[] Params) GetConstructor(DINode node)
 	{
-		var t = ResolveType(type);
-		var ctors = t.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+		var type = GetInstantiation(node.type);
+		var ctors = type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
 		if (ctors.Length == 0)
 			throw new InvalidOperationException($"Can't find a constructor for '{type.FullName}'");
 
 		if (ctors.Length == 1)
-			return ctors[0];
+			return (ctors[0], ctors[0].GetParameters());
 
 		// Try to find preferred ctor by attribute
 		foreach(var ctor in ctors)
 		{
 			if (ctor.GetCustomAttribute<InjectionConstructor>() is not null)
-				return ctor;
+				return (ctor, ctor.GetParameters());
 		}
 
 		// Get valid constructor with most arguments
 		int bestScore = -1;
 		int bestIdx = -1;
+		ParameterInfo[] bestParams = null;
+
 		for(int i = 0; i < ctors.Length; i++)
 		{
 			var pars = ctors[i].GetParameters();
@@ -165,16 +212,17 @@ internal class DITreeBuilder
 			{
 				bestScore = score;
 				bestIdx = i;
+				bestParams = pars;
 			}
 		}
 
-		if (bestIdx == -1)
-			throw new InvalidOperationException($"No usable constructors found for '{t.FullName}'.");
+		if (bestParams is null)
+			throw new InvalidOperationException($"No usable constructors found for '{type.FullName}'.");
 
-		return ctors[bestIdx];
+		return (ctors[bestIdx], bestParams);
 	}
 
-	private Type ResolveType(Type type)
+	private Type GetInstantiation(Type type)
 	{
 		if (Dyjector.instantiations.TryGetValue(type, out var st))
 			return st;
@@ -182,6 +230,7 @@ internal class DITreeBuilder
 		if (type.IsInterface)
 		{
 			var subTypes = AppDomain.CurrentDomain.GetAssemblies()
+				.Where(x => x.FullName is not null && !x.FullName.StartsWith("System.") && !x.FullName.StartsWith("Microsoft."))
 				.SelectMany(s => s.GetTypes())
 				.Where(p => !p.IsInterface && type.IsAssignableFrom(p));
 
@@ -190,7 +239,10 @@ internal class DITreeBuilder
 				throw new InvalidOperationException($"No instantiation of interface '{type.FullName}' found.");
 			if (c > 1)
 				throw new InvalidOperationException($"Multiple instantiations of interface '{type.FullName}' found. Specify which instantiation to use with '{nameof(Dyjector.RegisterInstantiation)}'.");
-			return subTypes.First();
+			
+			var subtype = subTypes.First();
+			Dyjector.RegisterInstantiation(type, subtype);
+			type = subtype;
 		}
 
 		return type;

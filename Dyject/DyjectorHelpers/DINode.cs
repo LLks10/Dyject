@@ -12,5 +12,6 @@ internal class DINode
 	public int depth;
 
 	public DINode parent;
+	public List<(ParameterInfo Param, DINode Node)> args = new();
 	public List<(FieldInfo Field, DINode Node)> children = new();
 }
