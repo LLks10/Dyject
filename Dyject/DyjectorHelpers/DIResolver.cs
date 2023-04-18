@@ -7,7 +7,7 @@ namespace Dyject.DyjectorHelpers;
 
 internal class DIResolver
 {
-	public static Func<object> ResolveDI(DynamicMethod method, DINode node)
+	public static Func<object> Resolve(DynamicMethod method, DINode node)
 	{
 		var ilgen = method.GetILGenerator();
 
@@ -18,7 +18,7 @@ internal class DIResolver
 		return method.CreateDelegate<Func<object>>();
 	}
 
-	public static Action<object> ResolveDI4Ctor(DynamicMethod method, DINode node)
+	public static Action<object> Resolve4Ctor(DynamicMethod method, DINode node)
 	{
 		var ilgen = method.GetILGenerator();
 
@@ -152,70 +152,24 @@ internal class DIResolver
 	private void HandleDefaultValue(Type type, object value)
 	{
 		if (type.IsEnum)
-		{
 			type = Enum.GetUnderlyingType(type);
-		}
-		if (value is null)
+
+		switch (value)
 		{
-			ilgen.Ldnull();
-			return;
+			case null	: ilgen.Ldnull();			  break;
+			case string	: ilgen.Ldstr((string)value); break;
+			case long	: ilgen.Ldc((long)value);	  break;
+			case ulong	: ilgen.Ldc((ulong)value);	  break;
+			case int	: ilgen.Ldc((int)value);	  break;
+			case uint	: ilgen.Ldc((uint)value);	  break;
+			case short	: ilgen.Ldc((short)value);	  break;
+			case ushort	: ilgen.Ldc((ushort)value);	  break;
+			case sbyte	: ilgen.Ldc((sbyte)value);	  break;
+			case byte	: ilgen.Ldc((byte)value);	  break;
+			case char	: ilgen.Ldc((char)value);	  break;
+			case double	: ilgen.Ldc((double)value);	  break;
+			case float	: ilgen.Ldc((float)value);	  break;
+			default: throw new NotSupportedException($"Default parameter value of type '{type.FullName}' is not supported.");
 		}
-		if(type == typeof(string))
-		{
-			ilgen.Ldstr((string)value);
-			return;
-		}
-		if (type == typeof(int))
-		{
-			ilgen.Ldc((int)value);
-			return;
-		}
-		if (type == typeof(uint))
-		{
-			ilgen.Ldc((uint)value);
-			return;
-		}
-		if (type == typeof(long))
-		{
-			ilgen.Ldc((long)value);
-			return;
-		}
-		if (type == typeof(ulong))
-		{
-			ilgen.Ldc((ulong)value);
-			return;
-		}
-		if (type == typeof(short))
-		{
-			ilgen.Ldc((short)value);
-		}
-		if (type == typeof(ushort))
-		{
-			ilgen.Ldc((ushort)value);
-		}
-		if (type == typeof(char))
-		{
-			ilgen.Ldc((char)value);
-			return;
-		}
-		if(type == typeof(sbyte))
-		{
-			ilgen.Ldc((sbyte)value);
-		}
-		if(type == typeof(byte))
-		{
-			ilgen.Ldc((byte)value);
-		}
-		if (type == typeof(float))
-		{
-			ilgen.Ldc((float)value);
-			return;
-		}
-		if (type == typeof(double))
-		{
-			ilgen.Ldc((double)value);
-			return;
-		}
-		throw new NotSupportedException($"Default parameter value of type '{type.FullName}' is not supported.");
 	}
 }

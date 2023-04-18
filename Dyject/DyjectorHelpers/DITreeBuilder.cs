@@ -7,7 +7,7 @@ namespace Dyject.DyjectorHelpers;
 
 internal class DITreeBuilder
 {
-	public static DINode BuildDITree(Type type)
+	public static DINode BuildTree(Type type)
 	{
 		DINode parent = new()
 		{
@@ -98,9 +98,8 @@ internal class DITreeBuilder
 		}
 	}
 
-	private DINode ResolveChild(DINode current, Type type, InjScope currentScope, InjScope? scope)
-	{
-		return currentScope > scope
+	private DINode ResolveChild(DINode current, Type type, InjScope currentScope, InjScope? scope) 
+		=> currentScope > scope
 			? ResolveTransient(type, current, currentScope)
 			: scope switch
 			{
@@ -109,7 +108,6 @@ internal class DITreeBuilder
 				InjScope.Singleton => ResolveSingleton(type, current),
 				_ => throw new UnreachableException()
 			};
-	}
 
 	private DINode ResolveTransient(Type type, DINode current, InjScope currentScope)
 	{

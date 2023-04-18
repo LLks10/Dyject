@@ -26,14 +26,19 @@ public static class Dyjector
         if (resolvers.TryGetValue(type, out Func<object>? func))
             return func();
 
-		var method = CreateDynamicMethod(type);
-		var tree = DITreeBuilder.BuildDITree(type);
-		var ctor = DIResolver.ResolveDI(method, tree);
-
-		resolvers.Add(type, ctor);
-
-		return ctor();
+		return Init(type)();
     }
+
+	internal static Func<object> Init(Type type)
+	{
+		var method = CreateDynamicMethod(type);
+		var tree = DITreeBuilder.BuildTree(type);
+		var ctor = DIResolver.Resolve(method, tree);
+
+		resolvers[type] = ctor;
+
+		return ctor;
+	}
 
 	internal static Action<object> Resolve4Ctor(Type type)
 	{
@@ -41,21 +46,10 @@ public static class Dyjector
 			return func;
 
 		var method = new DynamicMethod($"{methodNameConst}{type.Name}", null, new Type[] { typeof(object) });
-		var tree = DITreeBuilder.BuildDITree(type);
-		var ctor = DIResolver.ResolveDI4Ctor(method, tree);
+		var tree = DITreeBuilder.BuildTree(type);
+		var ctor = DIResolver.Resolve4Ctor(method, tree);
 
 		ctorResolvers.Add(type, ctor);
-
-		return ctor;
-	}
-
-	internal static Func<object> Init(Type type)
-	{
-		var method = CreateDynamicMethod(type);
-		var tree = DITreeBuilder.BuildDITree(type);
-		var ctor = DIResolver.ResolveDI(method, tree);
-
-		resolvers[type] = ctor;
 
 		return ctor;
 	}
@@ -135,11 +129,11 @@ public static class Dyjector
 
     private static object ResolveSingleton(Type type)
     {
-		var tree = DITreeBuilder.BuildDITree(type);
+		var tree = DITreeBuilder.BuildTree(type);
 
 		var method = new DynamicMethod($"{methodNameConst}{type.Name}", type, Array.Empty<Type>());
 
-		DIResolver.ResolveDI(method, tree);
+		DIResolver.Resolve(method, tree);
 
 		return method.CreateDelegate<Func<object>>()();
 	}
