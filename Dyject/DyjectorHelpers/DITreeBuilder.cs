@@ -72,6 +72,8 @@ internal class DITreeBuilder
 	private void FieldInjection(DINode current, InjScope currentScope)
 	{
 		var fields = GetInstantiation(current.type).GetFields(Dyjector.fieldsFlags);
+		var ctorTypes = current.args.Where(x => x.Param.DefaultValue != null).Select(x => x.Param.ParameterType).ToArray();
+
 		foreach (var field in fields)
 		{
 			var scope = field.FieldType.GetCustomAttribute<Injectable>()?.Scope;
@@ -82,6 +84,8 @@ internal class DITreeBuilder
 			if (scope is null)
 				continue;
 			if (field.GetCustomAttribute<DontInject>() is not null)
+				continue;
+			if (ctorTypes.Contains(field.FieldType))
 				continue;
 			if (field.FieldType == current.type)
 				throw new InvalidDependencyException($"Implementing self as dependency is not allowed. \"{current.type.FullName} -> {field.Name}\".");
