@@ -41,19 +41,17 @@ internal class DITreeBuilder
 
 		foreach (var par in pars)
 		{
-			if (par.HasDefaultValue)
-			{
-				current.args.Add((par, null));
-				continue;
-			}
-
 			var scope = par.ParameterType.GetCustomAttribute<Injectable>()?.Scope;
 
 			if (Dyjector.singletonMap.ContainsKey(par.ParameterType))
 				scope = InjScope.Singleton;
 
 			if (scope is null)
+			{
+				if (par.HasDefaultValue)
+					current.args.Add((par, null));
 				continue;
+			}
 			if (par.ParameterType == current.type)
 				throw new InvalidDependencyException($"Implementing self as dependency is not allowed. \"{current.type.FullName} -> {par.Name}\".");
 			if (visited.Contains(par))
@@ -71,7 +69,7 @@ internal class DITreeBuilder
 
 	private void FieldInjection(DINode current, InjScope currentScope)
 	{
-		var fields = GetInstantiation(current.type).GetFields(Dyjector.fieldsFlags);
+		var fields = Dyjector.TryGetInstantiation(current.type).GetFields(Dyjector.fieldsFlags);
 		var ctorTypes = current.args.Where(x => x.Param.DefaultValue != null).Select(x => x.Param.ParameterType).ToArray();
 
 		foreach (var field in fields)
@@ -168,7 +166,7 @@ internal class DITreeBuilder
 
 	private (ConstructorInfo Ctor, ParameterInfo[] Params) GetConstructor(DINode node)
 	{
-		var type = GetInstantiation(node.type);
+		var type = Dyjector.TryGetInstantiation(node.type);
 		var ctors = type.GetConstructors(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
 
 		if (ctors.Length == 0)
@@ -218,31 +216,5 @@ internal class DITreeBuilder
 			throw new InvalidOperationException($"No usable constructors found for '{type.FullName}'.");
 
 		return (ctors[bestIdx], bestParams);
-	}
-
-	private Type GetInstantiation(Type type)
-	{
-		if (Dyjector.instantiations.TryGetValue(type, out var st))
-			return st;
-		
-		if (type.IsInterface)
-		{
-			var subTypes = AppDomain.CurrentDomain.GetAssemblies()
-				.Where(x => x.FullName is not null && !x.FullName.StartsWith("System.") && !x.FullName.StartsWith("Microsoft."))
-				.SelectMany(s => s.GetTypes())
-				.Where(p => !p.IsInterface && type.IsAssignableFrom(p));
-
-			var c = subTypes.Count();
-			if (c == 0)
-				throw new InvalidOperationException($"No instantiation of interface '{type.FullName}' found.");
-			if (c > 1)
-				throw new InvalidOperationException($"Multiple instantiations of interface '{type.FullName}' found. Specify which instantiation to use with '{nameof(Dyjector.RegisterInstantiation)}'.");
-			
-			var subtype = subTypes.First();
-			Dyjector.RegisterInstantiation(type, subtype);
-			type = subtype;
-		}
-
-		return type;
 	}
 }

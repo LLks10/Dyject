@@ -1,6 +1,6 @@
 ﻿namespace Dyject.Attributes;
 
-[AttributeUsage(AttributeTargets.Class)]
+[AttributeUsage(AttributeTargets.Class | AttributeTargets.Interface)]
 public class Injectable : Attribute
 {
 	public InjScope Scope { get; }

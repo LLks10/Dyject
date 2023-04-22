@@ -118,6 +118,32 @@ public static class Dyjector
 		return singletons[idx];
 	}
 
+	internal static Type TryGetInstantiation(Type type)
+	{
+		if (instantiations.TryGetValue(type, out var st))
+			return st;
+
+		if (type.IsInterface)
+		{
+			var subTypes = AppDomain.CurrentDomain.GetAssemblies()
+				.Where(x => x.FullName is not null && !x.FullName.StartsWith("System.") && !x.FullName.StartsWith("Microsoft."))
+				.SelectMany(s => s.GetTypes())
+				.Where(p => !p.IsInterface && type.IsAssignableFrom(p));
+
+			var c = subTypes.Count();
+			if (c == 0)
+				throw new InvalidOperationException($"No instantiation of interface '{type.FullName}' found.");
+			if (c > 1)
+				throw new InvalidOperationException($"Multiple instantiations of interface '{type.FullName}' found. Specify which instantiation to use with '{nameof(Dyjector.RegisterInstantiation)}'.");
+
+			var subtype = subTypes.First();
+			Dyjector.RegisterInstantiation(type, subtype);
+			type = subtype;
+		}
+
+		return type;
+	}
+
 	internal static void Reset()
     {
         resolvers.Clear();

@@ -10,13 +10,13 @@ internal sealed class CircularDependencyException : Exception
 
 	public static void Throw(DINode errorNode)
 	{
-		var type = errorNode.type;
-
 		List<Type> path = new();
-		path.Add(type);
+		path.Add(errorNode.type);
+
+		var type = Dyjector.TryGetInstantiation(errorNode.type);
 
 		DINode current = errorNode.parent;
-		while (current.type != type)
+		while (Dyjector.TryGetInstantiation(current.type) != type)
 		{
 			path.Add(current.type);
 			current = current.parent;

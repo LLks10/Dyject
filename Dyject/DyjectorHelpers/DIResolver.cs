@@ -85,7 +85,7 @@ internal class DIResolver
 		foreach((var param, var node) in current.args)
 		{
 			// Set default value
-			if (param.HasDefaultValue)
+			if (node == null && param.HasDefaultValue)
 			{
 				HandleDefaultValue(param.ParameterType, param.DefaultValue);
 				continue;
